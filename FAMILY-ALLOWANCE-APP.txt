@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Allowance Tracker</title>
+    <meta name="description" content="Manage chores, track earnings, and reward your kids with this family allowance tracker app.">
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="manifest" href="#" id="manifest-placeholder">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMTA4IiBoZWlnaHQ9IjEwOCIgcng9IjQiIGZpbGw9IiM3YzNhZWQiLz48dGV4dCB4PSI2NCIgeT0iNzIiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjQ4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7wn5G8PC90ZXh0Pjwvc3ZnPg==">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide-out {
+            animation: slideOut 0.3s ease-out forwards;
+        }
+        
+        @keyframes slideOut {
+            to { opacity: 0; transform: translateX(100px); }
+        }
+
+        .modal {
+            display: none;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transform: translateY(100px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .install-prompt.show {
+            transform: translateY(0);
+        }
+
+        .offline-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #ef4444;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .offline-indicator.show {
+            display: block;
+        }
+
+        .online-indicator {
+            background: #10b981;
+        }
+
+        /* Native app styling */
+        .safe-area-top {
+            padding-top: env(safe-area-inset-top);
+        }
+        
+        .safe-area-bottom {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-pink-100 min-h-full font-sans safe-area-top safe-area-bottom">
+    <!-- Offline Indicator -->
+    <div id="offlineIndicator" class="offline-indicator">
+        📡 Offline Mode
+    </div>
+
+    <!-- Install Prompt -->
+    <div id="installPrompt" class="install-prompt">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <h3 class="font-semibold mb-1">📱 Install App</h3>
+                <p class="text-sm opacity-90">Add to your home screen for quick access!</p>
+            </div>
+            <div class="flex gap-2 ml-4">
+                <button id="installBtn" class="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium text-sm">Install</button>
+                <button id="dismissInstall" class="text-white opacity-75 hover:opacity-100 p-2">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">👨‍👩‍👧‍👦 Family Allowance Tracker</h1>
+            <p class="text-gray-600">Manage chores, track earnings, and reward your kids!</p>
+            <div id="appStatus" class="mt-2 text-sm text-gray-500"></div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="flex flex-wrap gap-4 mb-8 justify-center">
+            <button onclick="app.showAddKidModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                👶 Add Kid
+            </button>
+            <button onclick="app.showAddChoreModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                ✅ Add Chore
+            </button>
+            <button onclick="app.showPayoutModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                💰 Pay Allowances
+            </button>
+        </div>
+
+        <!-- Family Overview -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Family Overview</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-blue-600" id="totalKids">0</div>
+                    <div class="text-sm text-gray-600">Kids</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-green-600" id="totalChores">0</div>
+                    <div class="text-sm text-gray-600">Active Chores</div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-4 text-center">
+                    <div class="text-3xl font-bold text-purple-600" id="totalEarnings">$0</div>
+                    <div class="text-sm text-gray-600">Total Pending</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kids Cards -->
+        <div id="kidsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Kids will be rendered here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 bg-white rounded-xl shadow-lg">
+            <div class="text-6xl mb-4">👨‍👩‍👧‍👦</div>
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">Welcome to Family Allowance Tracker!</h3>
+            <p class="text-gray-600 mb-6">Start by adding your kids and assigning them chores to earn allowance.</p>
+            <button onclick="app.showAddKidModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                Add Your First Kid
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Kid Modal -->
+    <div id="addKidModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold mb-4">Add New Kid</h3>
+            <form id="addKidForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                    <input type="text" id="kidName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Age</label>
+                    <input type="number" id="kidAge" min="3" max="18" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Avatar</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" class="avatar-option p-2 text-2xl border-2 border-transparent rounded-lg hover:border-blue-500" data-avatar="👦">👦</button>
+                        <button type="button" class="avatar-option p-2 text-2xl border-2 border-transparent rounded-lg hover:border-blue-500" data-avatar="👧">👧</button>
+                        <button type="button" class="avatar-option p-2 text-2xl border-2 border-transparent rounded-lg hover:border-blue-500" data-avatar="🧒">🧒</button>
+                        <button type="button" class="avatar-option p-2 text-2xl border-2 border-transparent rounded-lg hover:border-blue-500" data-avatar="👶">👶</button>
+                    </div>
+                    <input type="hidden" id="kidAvatar" value="👦">
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="app.hideAddKidModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Add Kid</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Chore Modal -->
+    <div id="addChoreModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold mb-4">Add New Chore</h3>
+            <form id="addChoreForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Chore Description</label>
+                    <input type="text" id="choreDescription" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Assign to (select one or more)</label>
+                    <div id="kidCheckboxes" class="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-3">
+                        <!-- Kid checkboxes will be populated here -->
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Reward Amount</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-gray-500">$</span>
+                        <input type="number" id="choreReward" min="0.25" step="0.25" class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="app.hideAddChoreModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Add Chore</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payout Modal -->
+    <div id="payoutModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold mb-4">💰 Pay Allowances</h3>
+            <div id="payoutList" class="space-y-3 mb-6">
+                <!-- Payout items will be rendered here -->
+            </div>
+            <div class="flex gap-3">
+                <button type="button" onclick="app.hidePayoutModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onclick="app.processPayouts()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Pay All</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Native app features (will work when built with Capacitor)
+        class NativeFeatures {
+            static async vibrate() {
+                try {
+                    if (window.Haptics) {
+                        await window.Haptics.impact({ style: 'light' });
+                    } else if (navigator.vibrate) {
+                        navigator.vibrate(50);
+                    }
+                } catch (e) {
+                    console.log('Vibration not available');
+                }
+            }
+
+            static async setStatusBar() {
+                try {
+                    if (window.StatusBar) {
+                        await window.StatusBar.setStyle({ style: 'light' });
+                        await window.StatusBar.setBackgroundColor({ color: '#7c3aed' });
+                    }
+                } catch (e) {
+                    console.log('Status bar not available');
+                }
+            }
+
+            static async handleAppStateChange() {
+                try {
+                    if (window.CapacitorApp) {
+                        window.CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+                            if (isActive) {
+                                app.render(); // Refresh when app becomes active
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.log('App state listener not available');
+                }
+            }
+        }
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    const CACHE_NAME = 'family-allowance-v1';
+                    const urlsToCache = ['/'];
+
+                    self.addEventListener('install', event => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME)
+                                .then(cache => cache.addAll(urlsToCache))
+                        );
+                    });
+
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(
+                            caches.match(event.request)
+                                .then(response => {
+                                    if (response) {
+                                        return response;
+                                    }
+                                    return fetch(event.request);
+                                })
+                        );
+                    });
+                `;
+                
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                navigator.serviceWorker.register(swUrl)
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                        document.getElementById('appStatus').textContent = '✅ App ready for offline use';
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+
+        // PWA Manifest
+        const manifest = {
+            name: "Family Allowance Tracker",
+            short_name: "Allowance",
+            description: "Manage chores, track earnings, and reward your kids",
+            start_url: "/",
+            display: "standalone",
+            background_color: "#f9fafb",
+            theme_color: "#7c3aed",
+            orientation: "portrait",
+            icons: [
+                {
+                    src: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMTA4IiBoZWlnaHQ9IjEwOCIgcng9IjQiIGZpbGw9IiM3YzNhZWQiLz48dGV4dCB4PSI2NCIgeT0iNzIiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjQ4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7wn5G8PC90ZXh0Pjwvc3ZnPg==",
+                    sizes: "128x128",
+                    type: "image/svg+xml"
+                },
+                {
+                    src: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3QgeD0iNDgiIHk9IjQ4IiB3aWR0aD0iNDE2IiBoZWlnaHQ9IjQxNiIgcng9IjE2IiBmaWxsPSIjN2MzYWVkIi8+PHRleHQgeD0iMjU2IiB5PSIyODgiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjE5MiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+RvDwvdGV4dD48L3N2Zz4=",
+                    sizes: "512x512",
+                    type: "image/svg+xml"
+                }
+            ]
+        };
+
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        document.getElementById('manifest-placeholder').href = manifestUrl;
+
+        // PWA Install Prompt
+        let deferredPrompt;
+        const installPrompt = document.getElementById('installPrompt');
+        const installBtn = document.getElementById('installBtn');
+        const dismissBtn = document.getElementById('dismissInstall');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installPrompt.classList.add('show');
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                }
+                deferredPrompt = null;
+                installPrompt.classList.remove('show');
+            }
+        });
+
+        dismissBtn.addEventListener('click', () => {
+            installPrompt.classList.remove('show');
+            localStorage.setItem('installPromptDismissed', 'true');
+        });
+
+        // Check if already dismissed
+        if (localStorage.getItem('installPromptDismissed')) {
+            installPrompt.style.display = 'none';
+        }
+
+        // Online/Offline Status
+        const offlineIndicator = document.getElementById('offlineIndicator');
+        
+        function updateOnlineStatus() {
+            if (navigator.onLine) {
+                offlineIndicator.classList.remove('show');
+                offlineIndicator.classList.add('online-indicator');
+                offlineIndicator.textContent = '🌐 Online';
+                setTimeout(() => offlineIndicator.classList.remove('show'), 2000);
+            } else {
+                offlineIndicator.classList.remove('online-indicator');
+                offlineIndicator.textContent = '📡 Offline Mode';
+                offlineIndicator.classList.add('show');
+            }
+        }
+
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
+        class FamilyAllowanceApp {
+            constructor() {
+                this.kids = JSON.parse(localStorage.getItem('familyKids')) || [];
+                this.chores = JSON.parse(localStorage.getItem('familyChores')) || [];
+                this.kidIdCounter = parseInt(localStorage.getItem('kidIdCounter')) || 1;
+                this.choreIdCounter = parseInt(localStorage.getItem('choreIdCounter')) || 1;
+                this.init();
+            }
+
+            async init() {
+                this.bindEvents();
+                this.render();
+                this.setupPWAFeatures();
+                await NativeFeatures.setStatusBar();
+                await NativeFeatures.handleAppStateChange();
+            }
+
+            setupPWAFeatures() {
+                // Check if running as PWA
+                if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+                    document.getElementById('appStatus').textContent = '📱 Running as installed app';
+                    installPrompt.style.display = 'none';
+                }
+
+                // Add keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                        switch(e.key) {
+                            case 'k':
+                                e.preventDefault();
+                                this.showAddKidModal();
+                                break;
+                            case 'c':
+                                e.preventDefault();
+                                this.showAddChoreModal();
+                                break;
+                            case 'p':
+                                e.preventDefault();
+                                this.showPayoutModal();
+                                break;
+                        }
+                    }
+                });
+            }
+
+            bindEvents() {
+                // Add Kid Form
+                document.getElementById('addKidForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addKid();
+                });
+
+                // Add Chore Form
+                document.getElementById('addChoreForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addChore();
+                });
+
+                // Avatar selection
+                document.querySelectorAll('.avatar-option').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('border-blue-500'));
+                        e.target.classList.add('border-blue-500');
+                        document.getElementById('kidAvatar').value = e.target.dataset.avatar;
+                    });
+                });
+            }
+
+            async addKid() {
+                const name = document.getElementById('kidName').value.trim();
+                const age = parseInt(document.getElementById('kidAge').value);
+                const avatar = document.getElementById('kidAvatar').value;
+
+                if (name && age) {
+                    const kid = {
+                        id: this.kidIdCounter++,
+                        name: name,
+                        age: age,
+                        avatar: avatar,
+                        totalEarned: 0,
+                        pendingEarnings: 0
+                    };
+
+                    this.kids.push(kid);
+                    this.saveToStorage();
+                    this.hideAddKidModal();
+                    this.render();
+                    await NativeFeatures.vibrate();
+                    this.showNotification(`${name} added to the family! 🎉`);
+                }
+            }
+
+            async addChore() {
+                const description = document.getElementById('choreDescription').value.trim();
+                const reward = parseFloat(document.getElementById('choreReward').value);
+                const selectedKids = Array.from(document.querySelectorAll('#kidCheckboxes input[type="checkbox"]:checked'))
+                    .map(cb => parseInt(cb.value));
+
+                if (description && selectedKids.length > 0 && reward) {
+                    const chore = {
+                        id: this.choreIdCounter++,
+                        description: description,
+                        kidIds: selectedKids,
+                        reward: reward,
+                        completedBy: [],
+                        createdAt: new Date().toISOString()
+                    };
+
+                    this.chores.push(chore);
+                    this.saveToStorage();
+                    this.hideAddChoreModal();
+                    this.render();
+                    await NativeFeatures.vibrate();
+                    this.showNotification(`New chore "${description}" added! 📝`);
+                }
+            }
+
+            async completeChore(choreId, kidId) {
+                const chore = this.chores.find(c => c.id === choreId);
+                if (chore && !chore.completedBy.includes(kidId)) {
+                    chore.completedBy.push(kidId);
+                    
+                    const kid = this.kids.find(k => k.id === kidId);
+                    if (kid) {
+                        kid.pendingEarnings += chore.reward;
+                        await NativeFeatures.vibrate();
+                        this.showNotification(`${kid.name} completed "${chore.description}" and earned $${chore.reward.toFixed(2)}! 🎉`);
+                    }
+                    
+                    this.saveToStorage();
+                    this.render();
+                }
+            }
+
+            async deleteChore(choreId) {
+                const chore = this.chores.find(c => c.id === choreId);
+                this.chores = this.chores.filter(c => c.id !== choreId);
+                this.saveToStorage();
+                this.render();
+                this.showNotification(`Chore "${chore.description}" removed`);
+            }
+
+            async deleteKid(kidId) {
+                const kid = this.kids.find(k => k.id === kidId);
+                this.kids = this.kids.filter(k => k.id !== kidId);
+                // Remove kid from chore assignments and completed lists
+                this.chores.forEach(chore => {
+                    chore.kidIds = chore.kidIds.filter(id => id !== kidId);
+                    chore.completedBy = chore.completedBy.filter(id => id !== kidId);
+                });
+                // Remove chores with no assigned kids
+                this.chores = this.chores.filter(c => c.kidIds.length > 0);
+                this.saveToStorage();
+                this.render();
+                this.showNotification(`${kid.name} removed from family`);
+            }
+
+            async processPayouts() {
+                let totalPaid = 0;
+                this.kids.forEach(kid => {
+                    totalPaid += kid.pendingEarnings;
+                    kid.totalEarned += kid.pendingEarnings;
+                    kid.pendingEarnings = 0;
+                });
+                
+                // Remove fully completed chores (where all assigned kids have completed it)
+                this.chores = this.chores.filter(c => c.completedBy.length < c.kidIds.length);
+                
+                this.saveToStorage();
+                this.hidePayoutModal();
+                this.render();
+                await NativeFeatures.vibrate();
+                this.showNotification(`Paid out $${totalPaid.toFixed(2)} in allowances! 💰`);
+            }
+
+            showNotification(message) {
+                // Simple notification system
+                const notification = document.createElement('div');
+                notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300';
+                notification.textContent = message;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => notification.classList.remove('translate-x-full'), 100);
+                setTimeout(() => {
+                    notification.classList.add('translate-x-full');
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 3000);
+            }
+
+            showAddKidModal() {
+                document.getElementById('addKidModal').classList.add('active');
+                document.getElementById('kidName').value = '';
+                document.getElementById('kidAge').value = '';
+                document.getElementById('kidAvatar').value = '👦';
+                document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('border-blue-500'));
+                document.querySelector('[data-avatar="👦"]').classList.add('border-blue-500');
+            }
+
+            hideAddKidModal() {
+                document.getElementById('addKidModal').classList.remove('active');
+            }
+
+            showAddChoreModal() {
+                if (this.kids.length === 0) {
+                    this.showNotification('Please add at least one kid first! 👶');
+                    return;
+                }
+                
+                const checkboxContainer = document.getElementById('kidCheckboxes');
+                checkboxContainer.innerHTML = this.kids.map(kid => `
+                    <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input type="checkbox" value="${kid.id}" class="rounded">
+                        <span class="text-lg">${kid.avatar}</span>
+                        <span>${kid.name}</span>
+                    </label>
+                `).join('');
+                
+                document.getElementById('addChoreModal').classList.add('active');
+                document.getElementById('choreDescription').value = '';
+                document.getElementById('choreReward').value = '';
+            }
+
+            hideAddChoreModal() {
+                document.getElementById('addChoreModal').classList.remove('active');
+            }
+
+            showPayoutModal() {
+                const payoutList = document.getElementById('payoutList');
+                const kidsWithEarnings = this.kids.filter(k => k.pendingEarnings > 0);
+                
+                if (kidsWithEarnings.length === 0) {
+                    payoutList.innerHTML = '<p class="text-gray-500 text-center">No pending earnings to pay out.</p>';
+                } else {
+                    payoutList.innerHTML = kidsWithEarnings.map(kid => `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">${kid.avatar}</span>
+                                <span class="font-medium">${kid.name}</span>
+                            </div>
+                            <span class="text-lg font-bold text-green-600">$${kid.pendingEarnings.toFixed(2)}</span>
+                        </div>
+                    `).join('');
+                }
+                
+                document.getElementById('payoutModal').classList.add('active');
+            }
+
+            hidePayoutModal() {
+                document.getElementById('payoutModal').classList.remove('active');
+            }
+
+            saveToStorage() {
+                localStorage.setItem('familyKids', JSON.stringify(this.kids));
+                localStorage.setItem('familyChores', JSON.stringify(this.chores));
+                localStorage.setItem('kidIdCounter', this.kidIdCounter.toString());
+                localStorage.setItem('choreIdCounter', this.choreIdCounter.toString());
+            }
+
+            updateOverview() {
+                document.getElementById('totalKids').textContent = this.kids.length;
+                document.getElementById('totalChores').textContent = this.chores.length;
+                
+                const totalPending = this.kids.reduce((sum, kid) => sum + kid.pendingEarnings, 0);
+                document.getElementById('totalEarnings').textContent = `$${totalPending.toFixed(2)}`;
+            }
+
+            render() {
+                const kidsContainer = document.getElementById('kidsContainer');
+                const emptyState = document.getElementById('emptyState');
+
+                if (this.kids.length === 0) {
+                    kidsContainer.innerHTML = '';
+                    emptyState.style.display = 'block';
+                } else {
+                    emptyState.style.display = 'none';
+                    kidsContainer.innerHTML = this.kids.map(kid => {
+                        const kidChores = this.chores.filter(c => c.kidIds.includes(kid.id));
+                        const activeChores = kidChores.filter(c => !c.completedBy.includes(kid.id));
+                        const completedChores = kidChores.filter(c => c.completedBy.includes(kid.id));
+
+                        return `
+                            <div class="bg-white rounded-xl shadow-lg p-6 fade-in">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-3xl">${kid.avatar}</span>
+                                        <div>
+                                            <h3 class="text-xl font-semibold text-gray-800">${kid.name}</h3>
+                                            <p class="text-sm text-gray-600">Age ${kid.age}</p>
+                                        </div>
+                                    </div>
+                                    <button onclick="app.deleteKid(${kid.id})" class="text-red-500 hover:text-red-700 p-1 rounded" title="Remove kid">
+                                        🗑️
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-3 mb-4">
+                                    <div class="bg-green-50 rounded-lg p-3 text-center">
+                                        <div class="text-lg font-bold text-green-600">$${kid.pendingEarnings.toFixed(2)}</div>
+                                        <div class="text-xs text-gray-600">Pending</div>
+                                    </div>
+                                    <div class="bg-blue-50 rounded-lg p-3 text-center">
+                                        <div class="text-lg font-bold text-blue-600">$${kid.totalEarned.toFixed(2)}</div>
+                                        <div class="text-xs text-gray-600">Total Earned</div>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <h4 class="font-medium text-gray-700">Active Chores (${activeChores.length})</h4>
+                                    ${activeChores.length === 0 ? 
+                                        '<p class="text-sm text-gray-500">No active chores</p>' :
+                                        activeChores.map(chore => {
+                                            const otherKids = chore.kidIds.filter(id => id !== kid.id);
+                                            const otherKidNames = otherKids.map(id => {
+                                                const otherKid = this.kids.find(k => k.id === id);
+                                                return otherKid ? otherKid.name : '';
+                                            }).filter(name => name);
+                                            
+                                            return `
+                                                <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                                    <div class="flex-1">
+                                                        <span class="text-sm block">${chore.description}</span>
+                                                        ${otherKidNames.length > 0 ? `<span class="text-xs text-gray-500">Also assigned to: ${otherKidNames.join(', ')}</span>` : ''}
+                                                    </div>
+                                                    <span class="text-sm font-medium text-green-600 mr-2">$${chore.reward.toFixed(2)}</span>
+                                                    <button onclick="app.completeChore(${chore.id}, ${kid.id})" class="text-green-600 hover:text-green-700 text-xs px-2 py-1 bg-green-100 rounded">
+                                                        ✓ Done
+                                                    </button>
+                                                </div>
+                                            `;
+                                        }).join('')
+                                    }
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                this.updateOverview();
+            }
+        }
+
+        // Initialize the app
+        const app = new FamilyAllowanceApp();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98cf3fcf80f8e672',t:'MTc2MDE5NTA1OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
